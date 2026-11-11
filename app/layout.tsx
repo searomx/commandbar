@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Comanda | Seu balcão digital",
+  title: "CommandBar | Seu balcão digital",
   description: "Controle de comandas individuais e despesas do seu bar.",
 };
 

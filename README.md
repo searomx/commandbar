@@ -17,11 +17,23 @@ O servidor PostgreSQL existente não é atualizado por este projeto.
    PIX_KEY="CHAVE_PIX_DO_ESTABELECIMENTO"
    PIX_NAME="NOME DO RECEBEDOR"
    PIX_CITY="CIDADE"
+   SMTP_HOST="smtp.exemplo.com"
+   SMTP_PORT="587"
+   SMTP_SECURE="false"
+   SMTP_USER="usuario_smtp"
+   SMTP_PASSWORD="senha_smtp"
+   SMTP_FROM="remetente@exemplo.com"
    ```
 
    Codifique caracteres especiais das credenciais como URL. Preserve opções
    TLS exigidas pelo provedor. CLI e adaptador usam o schema indicado na URL.
    Pix sem configuração válida informa o problema e permite dinheiro/cartão.
+   O envio exige SMTP autenticado e TLS: use `SMTP_SECURE=true` para TLS
+   direto (geralmente porta 465) ou `false` para STARTTLS (geralmente 587).
+   Sem configuração válida ou em caso de falha no envio, o turno permanece
+   aberto. Mantenha as credenciais somente no ambiente do servidor.
+   Para um servidor com autoridade certificadora privada, configure também
+   `SMTP_CA_FILE` com o caminho do certificado CA em formato PEM.
 
 2. Instale e aplique as migrações existentes:
 
@@ -48,6 +60,19 @@ O servidor PostgreSQL existente não é atualizado por este projeto.
    entrar: um administrador deve migrar essas senhas para o mesmo formato,
    sem converter texto puro em um mecanismo alternativo de login.
    Não existe cadastro público nem credencial padrão.
+
+   Alternativamente, o seed configurado na CLI usa `SEED_ADMIN_PASSWORD` e
+   o nome e e-mail definidos em `prisma/seed.ts`:
+
+   ```bash
+   read -rs -p "Senha inicial (recomendado: mínimo 12 caracteres): " SEED_ADMIN_PASSWORD
+   echo
+   export SEED_ADMIN_PASSWORD
+   npx prisma db seed --config prisma7.config.ts
+   unset SEED_ADMIN_PASSWORD
+   ```
+
+   Esse comando também não altera a senha de uma conta existente.
 
 4. Cadastre previamente o catálogo, por exemplo com Prisma Studio:
 
@@ -88,8 +113,15 @@ O servidor PostgreSQL existente não é atualizado por este projeto.
   compartilhado não é revogado. Isso não registra pagamento.
 - Só **Confirmar pagamento** grava `PAID`, a data do servidor e o meio de
   pagamento. O card fica verde e bloqueado, até o encerramento do turno.
-- **Encerrar aplicativo** encerra o turno de todos os dispositivos após
-  reautenticação de ADMIN/MANAGER. Não fecha a aba do navegador.
+- **Encerrar aplicativo** exige reautenticação de ADMIN e envia ao e-mail
+  desse administrador um PDF antes de encerrar o turno de todos os dispositivos.
+  O relatório usa o dia de início do fechamento no horário de Brasília e
+  inclui comandas criadas nesse dia, agrupadas por cliente e situação. O total
+  inclui contas pagas e pendentes; `FAILED` é tratado como pendente. Fechamentos
+  no mesmo dia podem repetir comandas. O nome exibido é o do usuário logado.
+  Confirmação SMTP indica aceitação pelo servidor, não entrega na caixa postal;
+  falhas de confirmação podem causar envio duplicado em uma nova tentativa.
+  Não fecha a aba do navegador.
   No próximo turno, apenas pendências antigas voltam em vermelho-claro,
   clicáveis. Contas pagas continuam no banco como histórico.
 - Atualizar a página ou sair da conta não encerra o turno.

@@ -34,9 +34,27 @@ model Customer{
   createdAt DateTime @default(now()) @db.Timestamp(6)
   updatedAt DateTime @updatedAt @db.Timestamp(6)
 }
+model Categories {
+  id    Int    @id @default(autoincrement())
+  name  String @db.VarChar(50)
+  products Product[]
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @db.Timestamp(6)
+}
+model Groups {
+  id    Int    @id @default(autoincrement())
+  name  String @db.VarChar(50)
+  products Product[]
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @db.Timestamp(6)
+}
 model Product {
   id    Int    @id @default(autoincrement())
   name  String @db.VarChar(50)
+  categoryId Int
+  category   Categories @relation(fields: [categoryId], references: [id])
+  groupId Int
+  group   Groups @relation(fields: [groupId], references: [id])
   description String @db.VarChar(255)
   unit  String @db.VarChar(15)
   price Decimal @db.Decimal(10, 2)
@@ -46,6 +64,7 @@ model Product {
   createdAt DateTime @default(now()) @db.Timestamp(6)
   updatedAt DateTime @updatedAt @db.Timestamp(6)
 }
+
 model Order {
   id    Int    @id @default(autoincrement())
   customerId Int

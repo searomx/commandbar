@@ -5,7 +5,15 @@ import { randomBytes } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { Pool } from "pg";
-import { hashPassword } from "../lib/password";
+import { hashPassword, verifyPassword } from "../lib/password";
+import { delimiter, resolve } from "node:path";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { SMTPServer } from "smtp-server";
+import { simpleParser } from "mailparser";
+import { PDFParse } from "pdf-parse";
+import { reportDay } from "../lib/daily-report";
 
 test("fluxos reais de comandas em schema isolado e descartável", { timeout: 120_000 }, async (t) => {
   const original = process.env.DATABASE_URL;
@@ -15,7 +23,48 @@ test("fluxos reais de comandas em schema isolado e descartável", { timeout: 120
   url.searchParams.set("schema", schema);
   const pool = new Pool({ connectionString: original });
   let disconnect: (() => Promise<void>) | undefined;
+  const temp = await mkdtemp(join(tmpdir(), "commandbar-smtp-test-"));
+  const smtpKeys = ["SMTP_HOST", "SMTP_PORT", "SMTP_SECURE", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM", "SMTP_CA_FILE"] as const;
+  const originalSmtp = Object.fromEntries(smtpKeys.map((key) => [key, process.env[key]]));
+  const messages: Buffer[] = [];
+  let rejectMail = false;
+  let holdMail: (() => Promise<void>) | undefined;
+  let smtp: SMTPServer | undefined;
+  const secureSmtp = process.env.SMTP_TEST_SECURE === "true";
   try {
+    const keyFile = join(temp, "key.pem");
+    const certFile = join(temp, "cert.pem");
+    await promisify(execFile)("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", keyFile, "-out", certFile,
+      "-days", "1", "-subj", "/CN=127.0.0.1", "-addext", "subjectAltName=IP:127.0.0.1", "-addext", "basicConstraints=critical,CA:TRUE"]);
+    smtp = new SMTPServer({
+      secure: secureSmtp, key: await readFile(keyFile), cert: await readFile(certFile),
+      onAuth(auth, _session, callback) {
+        if (auth.username === "test" && auth.password === "test") callback(null, { user: "test" });
+        else callback(new Error("Credenciais inválidas"));
+      },
+      onData(stream, _session, callback) {
+        const chunks: Buffer[] = [];
+        stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+        stream.on("end", async () => {
+          if (rejectMail) callback(new Error("Falha SMTP simulada"));
+          else {
+            if (holdMail) await holdMail();
+            messages.push(Buffer.concat(chunks));
+            callback();
+          }
+        });
+      },
+    });
+    await new Promise<void>((resolve, reject) => {
+      smtp!.once("error", reject);
+      smtp!.listen(0, "127.0.0.1", resolve);
+    });
+    const address = smtp.server.address();
+    assert.ok(address && typeof address !== "string");
+    Object.assign(process.env, {
+      SMTP_HOST: "127.0.0.1", SMTP_PORT: String(address.port), SMTP_SECURE: String(secureSmtp),
+      SMTP_USER: "test", SMTP_PASSWORD: "test", SMTP_FROM: "remetente@example.test", SMTP_CA_FILE: certFile,
+    });
     await pool.query(`CREATE SCHEMA "${schema}"`);
     process.env.DATABASE_URL = url.toString();
     try {
@@ -27,6 +76,24 @@ test("fluxos reais de comandas em schema isolado e descartável", { timeout: 120
     const { executeCommand, readSnapshot } = await import("../lib/orders");
     const { authenticate } = await import("../lib/auth");
     disconnect = () => db.$disconnect();
+    await t.test("seed da CLI cria administrador com senha compatível e preserva conta existente", async () => {
+      const password = "Senha-Seed-Teste-1234";
+      const runSeed = (seedPassword: string) => promisify(execFile)(process.execPath, ["node_modules/prisma/build/index.js", "db", "seed", "--config", "prisma7.config.ts"], {
+        env: {
+          ...process.env,
+          PATH: `${resolve("node_modules/.bin")}${delimiter}${process.env.PATH ?? ""}`,
+          SEED_ADMIN_PASSWORD: seedPassword,
+        },
+        timeout: 60_000,
+      });
+      await runSeed(password);
+      const seeded = await db.user.findUniqueOrThrow({ where: { email: "searomx@gmail.com" } });
+      assert.equal(seeded.role, "ADMIN");
+      assert.equal(await verifyPassword(password, seeded.password), true);
+      await runSeed("Outra-Senha-Teste-1234");
+      const unchanged = await db.user.findUniqueOrThrow({ where: { id: seeded.id } });
+      assert.equal(unchanged.password, seeded.password);
+    });
     const admin = await db.user.create({ data: {
       name: "Teste administrador", email: "admin@example.test",
       password: await hashPassword("Senha-Teste-1234"), role: "ADMIN",
@@ -35,7 +102,9 @@ test("fluxos reais de comandas em schema isolado e descartável", { timeout: 120
       name: "Teste atendimento", email: "user@example.test",
       password: await hashPassword("Senha-Teste-1234"), role: "USER",
     } });
-    const product = await db.product.create({ data: { name: "Produto de teste", price: "10.10", unit: "un", description: "", mark: "", stockAmount: 10 } });
+    const category = await db.categories.create({ data: { name: "Categoria teste" } });
+    const group = await db.groups.create({ data: { name: "Grupo teste" } });
+    const product = await db.product.create({ data: { name: "Produto de teste", price: "10.10", unit: "un", description: "", mark: "", stockAmount: 10, categoryId: category.id, groupId: group.id } });
     const customer = await db.customer.create({ data: { name: "Cliente de teste" } });
 
     await t.test("credenciais inválidas e bloqueio após cinco tentativas", async () => {
@@ -93,7 +162,54 @@ test("fluxos reais de comandas em schema isolado e descartável", { timeout: 120
     const shiftId = (await readSnapshot()).shift!.id;
     await t.test("fechamento exige autorização e pendências sobrevivem a vários turnos", async () => {
       await assert.rejects(executeCommand({ type: "closeShift", shiftId, email: "", password: "" }, user.id), /autorização/);
-      await executeCommand({ type: "closeShift", shiftId, email: "", password: "" }, user.id, admin.id);
+      const manager = await db.user.findUniqueOrThrow({ where: { email: "Manager@example.test" } });
+      await assert.rejects(executeCommand({ type: "closeShift", shiftId, email: "", password: "" }, user.id, manager.id), /ADMIN/);
+      const savedHost = process.env.SMTP_HOST;
+      assert.ok(savedHost);
+      delete process.env.SMTP_HOST;
+      await assert.rejects(executeCommand({ type: "closeShift", shiftId, email: "", password: "" }, user.id, admin.id), /Configure SMTP_HOST/);
+      process.env.SMTP_HOST = savedHost;
+      assert.equal((await readSnapshot()).shift?.id, shiftId);
+      rejectMail = true;
+      await assert.rejects(executeCommand({ type: "closeShift", shiftId, email: "", password: "" }, user.id, admin.id), /continua aberto/);
+      rejectMail = false;
+      assert.equal((await readSnapshot()).shift?.id, shiftId);
+      assert.equal(messages.length, 0);
+      const oldCustomer = await db.customer.create({ data: { name: "Fora do dia" } });
+      await db.order.create({ data: {
+        customerId: oldCustomer.id, totalAmount: "9999.99", paymentStatus: "PAID",
+        createdAt: new Date(reportDay(new Date()).start.getTime() - 1),
+      } });
+      await db.order.create({ data: { customerId: customer.id, totalAmount: "1.25", paymentStatus: "PAID" } });
+      let releaseMail!: () => void;
+      let mailArrived!: () => void;
+      const mailHeld = new Promise<void>((resolve) => { releaseMail = resolve; });
+      const mailReady = new Promise<void>((resolve) => { mailArrived = resolve; });
+      holdMail = async () => { mailArrived(); await mailHeld; };
+      const closing = executeCommand({ type: "closeShift", shiftId, email: "", password: "" }, user.id, admin.id);
+      await mailReady;
+      const mutation = executeCommand({ type: "checkout", orderId }, user.id);
+      try {
+        const state = await Promise.race([mutation.then(() => "finished", () => "finished"), new Promise<string>((resolve) => setTimeout(() => resolve("waiting"), 100))]);
+        assert.equal(state, "waiting");
+      } finally {
+        holdMail = undefined;
+        releaseMail();
+      }
+      await closing;
+      await assert.rejects(mutation, /encerrado/);
+      const email = await simpleParser(messages[0]);
+      assert.equal(email.to && !Array.isArray(email.to) ? email.to.value[0].address : undefined, admin.email);
+      assert.equal(email.attachments.length, 1);
+      assert.equal(email.attachments[0].contentType, "application/pdf");
+      const parser = new PDFParse({ data: email.attachments[0].content });
+      try {
+        const { text } = await parser.getText();
+        for (const expected of ["Relatório Diário de Movimentação", user.name, customer.name, "20,20", "1,25", "21,45", "Pendente", "Pago"]) {
+          assert.ok(text.includes(expected), `Texto ausente no relatório: ${expected}`);
+        }
+        assert.ok(!text.includes("Fora do dia"));
+      } finally { await parser.destroy(); }
       await assert.rejects(executeCommand({ type: "item", orderId, productId: product.id, quantity: "1" }, user.id), /encerrado/);
       await executeCommand({ type: "openShift" }, admin.id);
       const nextShift = (await readSnapshot()).shift!.id;
@@ -131,6 +247,16 @@ test("fluxos reais de comandas em schema isolado e descartável", { timeout: 120
       assert.equal(await db.order.count({ where: { id: orderId } }), 1);
     });
   } finally {
+    await new Promise<void>((resolve, reject) => {
+      if (!smtp?.server.listening) return resolve();
+      smtp.close((error?: Error) => error ? reject(error) : resolve());
+    });
+    for (const key of smtpKeys) {
+      const value = originalSmtp[key];
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    await rm(temp, { recursive: true, force: true });
     await disconnect?.();
     process.env.DATABASE_URL = original;
     await pool.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);

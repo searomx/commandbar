@@ -3,6 +3,8 @@ import { Prisma } from "@/app/generated/prisma/client";
 import { db } from "@/lib/db";
 import { AppError } from "@/lib/errors";
 import { commandSchema } from "@/lib/validation";
+import { buildDailyReport, reportDay } from "@/lib/daily-report";
+import { sendDailyReport } from "@/lib/report-email";
 import type { Snapshot } from "@/lib/contracts";
 import type { z } from "zod";
 
@@ -63,9 +65,22 @@ export async function executeCommand(command: ValidCommand, userId: number, clos
     } else {
       if (!shift) throw new AppError("O turno está encerrado. Abra um novo turno antes de continuar.");
       if (command.type === "closeShift") {
-        if (!closingAdminId) throw new AppError("É necessária a autorização de ADMIN ou MANAGER.");
+        if (!closingAdminId) throw new AppError("É necessária a autorização de ADMIN.");
         if (shift.id !== command.shiftId) throw new AppError("O turno mudou. Atualize e confirme o turno atual.");
-        await tx.shift.update({ where: { id: shift.id }, data: { openKey: null, closedAt: new Date(), closedBy: closingAdminId } });
+        const [admin, user] = await Promise.all([
+          tx.user.findUnique({ where: { id: closingAdminId }, select: { role: true, email: true } }),
+          tx.user.findUnique({ where: { id: userId }, select: { name: true } }),
+        ]);
+        if (!admin || admin.role !== "ADMIN") throw new AppError("É necessária a autorização de ADMIN.");
+        if (!user) throw new AppError("Usuário não encontrado. Entre novamente.");
+        const closedAt = new Date();
+        const { start, end } = reportDay(closedAt);
+        const orders = await tx.order.findMany({
+          where: { createdAt: { gte: start, lt: end } },
+          select: { customerId: true, customer: { select: { name: true } }, createdAt: true, totalAmount: true, paymentStatus: true },
+        });
+        await sendDailyReport(buildDailyReport(closedAt, user.name, orders), admin.email);
+        await tx.shift.update({ where: { id: shift.id }, data: { openKey: null, closedAt, closedBy: closingAdminId } });
       } else if (command.type === "customer") {
         const customer = await tx.customer.create({ data: { name: command.name, phone: command.phone || null } });
         customerId = customer.id;
@@ -118,5 +133,5 @@ export async function executeCommand(command: ValidCommand, userId: number, clos
       }
     }
     return { ok: true as const, data: await readSnapshot(tx), orderId, customerId };
-  }, { timeout: 15_000 });
+  }, { timeout: command.type === "closeShift" ? 120_000 : 15_000 });
 }

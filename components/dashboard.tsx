@@ -157,7 +157,7 @@ function CloseShiftModal({ shiftId, pendingCount, run, busy, onClose }: { shiftI
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [fields, setFields] = useState<Record<string, string[] | undefined>>({});
-  return <Modal title="Encerrar o turno do bar" onClose={onClose}><div className="dialog-body"><p>O encerramento vale para todos os dispositivos. {pendingCount ? `${pendingCount} conta(s) pendente(s) serão retomadas no próximo turno.` : "As contas pagas sairão do painel no próximo turno."}</p><p className="muted">Para autorizar, informe as credenciais de uma conta ADMIN ou MANAGER.</p>
+  return <Modal title="Encerrar o turno do bar" onClose={onClose}><div className="dialog-body"><p>O encerramento vale para todos os dispositivos. {pendingCount ? `${pendingCount} conta(s) pendente(s) serão retomadas no próximo turno.` : "As contas pagas sairão do painel no próximo turno."}</p><p className="muted">Informe as credenciais de ADMIN. O relatório diário será enviado ao e-mail desse administrador antes do encerramento.</p>
     <Form className="form-stack" action={async () => {
       const result = await run({ type: "closeShift", shiftId, email, password });
       if (result.ok) onClose();
@@ -165,7 +165,7 @@ function CloseShiftModal({ shiftId, pendingCount, run, busy, onClose }: { shiftI
     }}>
       <div className="field"><label htmlFor="admin-email">E-mail do responsável</label><input id="admin-email" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required maxLength={50} aria-invalid={!!fields.email} aria-describedby={fields.email ? "admin-email-error" : undefined} /><FieldError id="admin-email-error" errors={fields.email} /></div>
       <div className="field"><label htmlFor="admin-password">Senha do responsável</label><input id="admin-password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required maxLength={200} aria-invalid={!!fields.password} aria-describedby={fields.password ? "admin-password-error" : undefined} /><FieldError id="admin-password-error" errors={fields.password} /></div>
-      <Notice error>{error}</Notice><button className="button danger wide" disabled={busy}>{busy ? "Verificando…" : "Autorizar e encerrar turno"}</button>
+      <Notice error>{error}</Notice><button className="button danger wide" disabled={busy}>{busy ? "Gerando relatório e encerrando…" : "Autorizar e encerrar turno"}</button>
     </Form>
   </div></Modal>;
 }

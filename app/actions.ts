@@ -37,7 +37,7 @@ export async function mutateAction(input: unknown): Promise<MutationResult> {
     let closingAdminId: number | undefined;
     if (command.type === "closeShift") {
       const admin = await authenticate(command.email, command.password);
-      if (admin.role !== "ADMIN" && admin.role !== "MANAGER") throw new AppError("Esta conta não pode encerrar turnos. Use ADMIN ou MANAGER.");
+      if (admin.role !== "ADMIN") throw new AppError("Esta conta não pode encerrar turnos. Use uma conta ADMIN.");
       closingAdminId = admin.id;
     }
     return await executeCommand(command, user.id, closingAdminId);

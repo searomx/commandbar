@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Moon, Sun, X, Wine } from "lucide-react";
 
 export function Brand() {
-  return <span className="brand"><span className="brand-mark"><Wine size={23} strokeWidth={1.7} aria-hidden="true" /></span>comanda<span className="brand-dot">.</span></span>;
+  return <span className="brand"><span className="brand-mark"><Wine size={23} strokeWidth={1.7} aria-hidden="true" /></span>commandBar<span className="brand-dot">.</span></span>;
 }
 
 export function ThemeToggle() {
