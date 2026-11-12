@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate --config prisma7.config.ts && prisma migrate deploy --config prisma7.config.ts && next build",
+    "build": "prisma generate && prisma migrate deploy --config prisma7.config.ts && next build",
     "start": "next start",
     "lint": "eslint app lib components scripts tests prisma7.config.ts",
     "test": "tsx --test tests/*.test.ts",
