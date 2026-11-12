@@ -37,8 +37,11 @@ async function main() {
       const admin = await db.user.create({ data: { name: "Equipe de teste", email: "equipe@example.test", password: await hashPassword(password), role: "ADMIN" } });
       await db.user.create({ data: { name: "Atendimento de teste", email: "atendimento@example.test", password: await hashPassword(password), role: "USER" } });
       const shift = await db.shift.create({ data: { openKey: 1, openedBy: admin.id } });
-      const product = await db.product.create({ data: { name: "Chope de teste", description: "Exclusivo de testes", unit: "un", price: "12.50", mark: "", stockAmount: 100 } });
-      await db.product.create({ data: { name: "Porção de teste", description: "Exclusivo de testes", unit: "un", price: "38.00", mark: "", stockAmount: 100 } });
+      const category = await db.categories.create({ data: { name: "Categoria de teste" } });
+      const group = await db.groups.create({ data: { name: "Grupo de teste" } });
+      const refs = { categoryId: category.id, groupId: group.id };
+      const product = await db.product.create({ data: { ...refs, name: "Chope de teste", description: "Exclusivo de testes", unit: "un", price: "12.50", mark: "", stockAmount: 100 } });
+      await db.product.create({ data: { ...refs, name: "Porção de teste", description: "Exclusivo de testes", unit: "un", price: "38.00", mark: "", stockAmount: 100 } });
       for (const [index, name] of ["Cliente exemplo A", "Cliente exemplo B", "Cliente exemplo C", "Cliente exemplo D"].entries()) {
         const customer = await db.customer.create({ data: { name } });
         await db.order.create({ data: {
