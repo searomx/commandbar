@@ -69,7 +69,7 @@ export async function pixAction(orderId: number, expectedTotal: string): Promise
     if (!order.totalAmount.equals(expectedTotal)) throw new AppError("O total da conta mudou. Atualize o painel antes de gerar o Pix.");
     let payload: string;
     try {
-      payload = buildPix({ key: process.env.PIX_KEY, name: process.env.PIX_NAME, city: process.env.PIX_CITY }, order.totalAmount.toFixed(2), order.id);
+      payload = buildPix({ key: process.env.PIX_KEY, name: process.env.PIX_NAME ?? process.env.PIX_MERCHANT_NAME, city: process.env.PIX_CITY ?? process.env.PIX_MERCHANT_CITY }, order.totalAmount.toFixed(2), order.id);
     } catch (error) {
       if (error instanceof Error) throw new AppError(error.message);
       throw error;
