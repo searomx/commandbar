@@ -5,7 +5,7 @@ import Form from "next/form";
 import { ArrowDownLeft, ArrowUpRight, Check, ChevronRight, CircleCheck, Clock3, LogOut, Plus, RefreshCw, Search, ShieldCheck, Wallet, Wine } from "lucide-react";
 import { logoutAction, mutateAction, refreshAction } from "@/app/actions";
 import type { Command } from "@/lib/validation";
-import { currency, type Employee, type MutationResult, type OrderView, type Snapshot } from "@/lib/contracts";
+import { currency, orderDate, type Employee, type MutationResult, type OrderView, type Snapshot } from "@/lib/contracts";
 import { useUI } from "@/lib/ui-store";
 import { Brand, FieldError, Modal, Notice, ThemeToggle } from "@/components/primitives";
 import { OrderPanel } from "@/components/order-panel";
@@ -97,6 +97,7 @@ function OrderCard({ order, disabled }: { order: OrderView; disabled: boolean })
   const held = useRef(false);
   const start = useRef({ x: 0, y: 0 });
   const paid = order.paymentStatus === "PAID";
+  const openedDate = orderDate(order.createdAt);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
   function cancel() { if (timer.current) clearTimeout(timer.current); timer.current = null; }
   function pointerDown(e: PointerEvent<HTMLButtonElement>) {
@@ -108,10 +109,10 @@ function OrderCard({ order, disabled }: { order: OrderView; disabled: boolean })
     onPointerDown={pointerDown} onPointerUp={cancel} onPointerCancel={cancel} onPointerLeave={cancel}
     onPointerMove={(e) => { if (Math.hypot(e.clientX - start.current.x, e.clientY - start.current.y) > 10) cancel(); }}
     onClick={(e) => { cancel(); if (!held.current || e.detail === 0) select(order.id); held.current = false; }}
-    aria-label={`Comanda ${order.id}, ${order.customer.name}, ${currency(order.total)}, ${paid ? "paga" : "pendente"}`}>
+    aria-label={`Comanda ${order.id}, ${order.customer.name}, aberta em ${openedDate}, ${currency(order.total)}, ${paid ? "paga" : "pendente"}`}>
     <span className="card-top"><span className="order-number">#{String(order.id).padStart(3, "0")}</span><span className={`status ${paid ? "status-paid" : order.state === "CHECKOUT" ? "status-checkout" : ""}`}>{paid ? <Check size={12} aria-hidden="true" /> : <span className="status-dot" />}{paid ? "Paga" : order.state === "CHECKOUT" ? "Em cobrança" : "Pendente"}</span></span>
     <span className="customer-name">{order.customer.name}</span>
-    <span className="card-subtitle">{order.carried ? "Pendente de turno anterior" : `${order.items.length} ${order.items.length === 1 ? "item lançado" : "itens lançados"}`}</span>
+    <span className="card-subtitle">{order.carried ? "Pendente de turno anterior" : `${order.items.length} ${order.items.length === 1 ? "item lançado" : "itens lançados"}`}<span className="card-date">Aberta em <time dateTime={order.createdAt}>{openedDate}</time></span></span>
     <span className="card-bottom"><span><span className="card-total-label">Consumo total</span><strong>{currency(order.total)}</strong></span><span className="card-arrow">{paid ? <CircleCheck size={23} strokeWidth={1.5} aria-hidden="true" /> : <ArrowUpRight size={20} aria-hidden="true" />}</span></span>
     <span className="hold-feedback" aria-hidden="true" />
   </button>;

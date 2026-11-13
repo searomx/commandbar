@@ -29,3 +29,6 @@ export type MutationResult =
 
 export const currency = (amount: string | number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(amount));
+
+export const orderDate = (date: string) =>
+  new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(date));

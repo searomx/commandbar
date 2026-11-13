@@ -3,6 +3,12 @@ import assert from "node:assert/strict";
 import { buildPix, crc16 } from "../lib/pix";
 import { commandSchema, customerSchema, loginSchema } from "../lib/validation";
 import { hashPassword, verifyPassword } from "../lib/password";
+import { orderDate } from "../lib/contracts";
+
+test("data da comanda usa o horário de Brasília", () => {
+  assert.equal(orderDate("2026-11-13T02:59:00.000Z"), "12/11/2026");
+  assert.equal(orderDate("2026-11-13T03:00:00.000Z"), "13/11/2026");
+});
 
 test("senhas usam salt, hash e comparação segura; texto puro não é aceito", async () => {
   const password = "Teste-seguro-123!";

@@ -25,6 +25,24 @@ model User {
   role  ROLES
   sessions Session[]
 }
+model Licensed {
+  id    Int    @id @default(autoincrement())
+  name  String @db.VarChar(50)
+  address String @db.VarChar(50)
+  number String @db.VarChar(10)
+  zipCode String @db.VarChar(10)
+  district String @db.VarChar(50)
+  city String @db.VarChar(50)
+  state String @db.VarChar(2)
+  cnpj String @db.VarChar(20)
+  phone String @db.VarChar(20)
+  email String @db.VarChar(50)
+  contactName String @db.VarChar(50)
+  logoMarca String @db.VarChar(255)
+  ativo Boolean @default(true)
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @db.Timestamp(6)
+}
 model Customer{
   id    Int    @id @default(autoincrement())
   name  String @db.VarChar(30)

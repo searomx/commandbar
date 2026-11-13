@@ -176,6 +176,7 @@ h3 { font-size: 15px; font-weight: 600; }
 .status-checkout { background: var(--accent-soft); color: var(--accent); }
 .customer-name { display: block; margin-top: 26px; font-size: 17px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
 .card-subtitle { display: block; font-size: 11px; color: var(--muted); margin-top: 5px; }
+.card-date { display: block; margin-top: 5px; }
 .card-bottom { display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px dashed var(--line); margin-top: 23px; padding-top: 16px; gap: 7px; }
 .card-total-label { display: block; color: var(--muted); font-size: 10px; margin-bottom: 3px; }
 .card-bottom strong { display: block; font-size: 25px; font-weight: 600; letter-spacing: -.025em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }

@@ -10,7 +10,14 @@ export default function LoginPage() {
     </section>
     <section className="login-main">
       <div className="login-top"><span>Seu balcão digital</span><ThemeToggle /></div>
-      <div className="login-content"><span className="mobile-brand"><Brand /></span><h2>Bom ter você por aqui.</h2><p className="muted">Entre com sua conta para cuidar das comandas.</p><LoginForm /></div>
+      <div className="login-content">
+        <span className="mobile-brand">
+          <Brand />
+          </span>
+          <h2>Bom ter você por aqui.</h2>
+          <p className="muted">Entre com sua conta para cuidar das comandas.</p>
+          <LoginForm />
+      </div>
       <footer className="login-footer">Comanda · Simples de abrir. Fácil de fechar.</footer>
     </section>
   </main>;
